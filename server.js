@@ -1,8 +1,9 @@
 const express = require('express');
 const mysql = require('mysql');
+const inquirer = require('inquirer');
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 // Create MySQL connection
 const connection = mysql.createConnection({
@@ -20,53 +21,38 @@ connection.connect((err) => {
     console.log('Connected to MySQL database');
 });
 
-// Define API endpoints
+// Define routes
 
-// Get all departments
+// View all departments
 app.get('/departments', (req, res) => {
-    const query = "SELECT * FROM departments";
-    connection.query(query, (err, results) => {
+    connection.query('SELECT * FROM Departments', (err, results) => {
         if (err) {
-            console.error('Error fetching departments:', err);
-            res.status(500).json({ error: 'Internal Server Error' });
+            console.error('Error retrieving departments:', err);
+            res.status(500).send('Internal Server Error');
             return;
         }
         res.json(results);
     });
 });
 
-// Get all roles
+// View all roles
 app.get('/roles', (req, res) => {
-    const query = `
-        SELECT roles.id, roles.title, roles.salary, departments.name AS department
-        FROM roles
-        INNER JOIN departments ON roles.department_id = departments.id
-    `;
-    connection.query(query, (err, results) => {
+    connection.query('SELECT * FROM Roles', (err, results) => {
         if (err) {
-            console.error('Error fetching roles:', err);
-            res.status(500).json({ error: 'Internal Server Error' });
+            console.error('Error retrieving roles:', err);
+            res.status(500).send('Internal Server Error');
             return;
         }
         res.json(results);
     });
 });
 
-// Get all employees
+// View all employees
 app.get('/employees', (req, res) => {
-    const query = `
-        SELECT employees.id, employees.first_name, employees.last_name,
-               roles.title AS job_title, departments.name AS department,
-               roles.salary, CONCAT(managers.first_name, ' ', managers.last_name) AS manager
-        FROM employees
-        INNER JOIN roles ON employees.role_id = roles.id
-        INNER JOIN departments ON roles.department_id = departments.id
-        LEFT JOIN employees AS managers ON employees.manager_id = managers.id
-    `;
-    connection.query(query, (err, results) => {
+    connection.query('SELECT * FROM Employees', (err, results) => {
         if (err) {
-            console.error('Error fetching employees:', err);
-            res.status(500).json({ error: 'Internal Server Error' });
+            console.error('Error retrieving employees:', err);
+            res.status(500).send('Internal Server Error');
             return;
         }
         res.json(results);
@@ -75,72 +61,112 @@ app.get('/employees', (req, res) => {
 
 // Add a department
 app.post('/departments', (req, res) => {
-    const { name } = req.body;
-    const query = "INSERT INTO departments (name) VALUES (?)";
-    connection.query(query, [name], (err, results) => {
-        if (err) {
-            console.error('Error adding department:', err);
-            res.status(500).json({ error: 'Internal Server Error' });
-            return;
+    inquirer.prompt([
+        {
+            type: 'input',
+            name: 'departmentName',
+            message: 'Enter the name of the department:'
         }
-        res.status(201).json({ message: 'Department added successfully' });
+    ]).then((answers) => {
+        const { departmentName } = answers;
+        connection.query('INSERT INTO Departments (department_name) VALUES (?)', [departmentName], (err, result) => {
+            if (err) {
+                console.error('Error adding department:', err);
+                res.status(500).send('Internal Server Error');
+                return;
+            }
+            res.status(201).send('Department added successfully');
+        });
     });
 });
 
 // Add a role
 app.post('/roles', (req, res) => {
-    const { title, salary, department_id } = req.body;
-    const query = "INSERT INTO roles (title, salary, department_id) VALUES (?, ?, ?)";
-    connection.query(query, [title, salary, department_id], (err, results) => {
-        if (err) {
-            console.error('Error adding role:', err);
-            res.status(500).json({ error: 'Internal Server Error' });
-            return;
+    inquirer.prompt([
+        {
+            type: 'input',
+            name: 'title',
+            message: 'Enter the title of the role:'
+        },
+        {
+            type: 'input',
+            name: 'salary',
+            message: 'Enter the salary for the role:'
+        },
+        {
+            type: 'input',
+            name: 'departmentId',
+            message: 'Enter the department ID for the role:'
         }
-        res.status(201).json({ message: 'Role added successfully' });
+    ]).then((answers) => {
+        const { title, salary, departmentId } = answers;
+        connection.query('INSERT INTO Roles (title, salary, department_id) VALUES (?, ?, ?)', [title, salary, departmentId], (err, result) => {
+            if (err) {
+                console.error('Error adding role:', err);
+                res.status(500).send('Internal Server Error');
+                return;
+            }
+            res.status(201).send('Role added successfully');
+        });
     });
 });
 
 // Add an employee
 app.post('/employees', (req, res) => {
-    const { first_name, last_name, role_id, manager_id } = req.body;
-    const query = "INSERT INTO employees (first_name, last_name, role_id, manager_id) VALUES (?, ?, ?, ?)";
-    connection.query(query, [first_name, last_name, role_id, manager_id], (err, results) => {
-        if (err) {
-            console.error('Error adding employee:', err);
-            res.status(500).json({ error: 'Internal Server Error' });
-            return;
+    inquirer.prompt([
+        {
+            type: 'input',
+            name: 'firstName',
+            message: 'Enter the employee\'s first name:'
+        },
+        {
+            type: 'input',
+            name: 'lastName',
+            message: 'Enter the employee\'s last name:'
+        },
+        {
+            type: 'input',
+            name: 'roleId',
+            message: 'Enter the role ID for the employee:'
+        },
+        {
+            type: 'input',
+            name: 'managerId',
+            message: 'Enter the manager ID for the employee (if applicable):'
         }
-        res.status(201).json({ message: 'Employee added successfully' });
+    ]).then((answers) => {
+        const { firstName, lastName, roleId, managerId } = answers;
+        connection.query('INSERT INTO Employees (first_name, last_name, role_id, manager_id) VALUES (?, ?, ?, ?)', [firstName, lastName, roleId, managerId], (err, result) => {
+            if (err) {
+                console.error('Error adding employee:', err);
+                res.status(500).send('Internal Server Error');
+                return;
+            }
+            res.status(201).send('Employee added successfully');
+        });
     });
 });
 
 // Update an employee role
 app.put('/employees/:id/role', (req, res) => {
-    const { id } = req.params;
-    const { role_id } = req.body;
-    const query = "UPDATE employees SET role_id = ? WHERE id = ?";
-    connection.query(query, [role_id, id], (err, results) => {
-        if (err) {
-            console.error('Error updating employee role:', err);
-            res.status(500).json({ error: 'Internal Server Error' });
-            return;
+    const employeeId = req.params.id;
+    inquirer.prompt([
+        {
+            type: 'input',
+            name: 'roleId',
+            message: 'Enter the new role ID for the employee:'
         }
-        res.status(200).json({ message: 'Employee role updated successfully' });
+    ]).then((answers) => {
+        const { roleId } = answers;
+        connection.query('UPDATE Employees SET role_id = ? WHERE employee_id = ?', [roleId, employeeId], (err, result) => {
+            if (err) {
+                console.error('Error updating employee role:', err);
+                res.status(500).send('Internal Server Error');
+                return;
+            }
+            res.status(200).send('Employee role updated successfully');
+        });
     });
-});
-
-// Seed the database with sample data
-const seedDataQuery = `
-    -- Insert seed data for Departments, Roles, and Employees here
-`;
-
-connection.query(seedDataQuery, (err, results) => {
-    if (err) {
-        console.error('Error seeding database:', err);
-        return;
-    }
-    console.log('Database seeded with sample data');
 });
 
 // Start the server
