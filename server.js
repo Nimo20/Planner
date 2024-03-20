@@ -21,7 +21,6 @@ connection.connect((err) => {
     console.log('Connected to MySQL database');
 });
 
-// Define routes
 
 // View all departments
 app.get('/departments', (req, res) => {
