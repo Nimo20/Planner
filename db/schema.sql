@@ -1,11 +1,14 @@
 DROP DATABASE IF EXISTS employees;
+CREATE DATABASE IF NOT EXISTS employees;
+
+
+USE employees;
+
 
 CREATE TABLE departments (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(50) NOT NULL
 );
-
-USE employees;
 
 CREATE TABLE roles (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -14,7 +17,6 @@ CREATE TABLE roles (
     department_id INT,
     FOREIGN KEY (department_id) REFERENCES departments(id)
 );
-
 
 CREATE TABLE employees (
     id INT AUTO_INCREMENT PRIMARY KEY,

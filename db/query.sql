@@ -1,26 +1,26 @@
 SELECT
-    employee_id,
-    first_name,
-    last_name,
-    title AS job_title,
-    department_name,
-    salary,
+    e.id AS employee_id,
+    e.first_name,
+    e.last_name,
+    r.title AS job_title,
+    d.name AS department_name,
+    r.salary,
     CONCAT(m.first_name, ' ', m.last_name) AS manager_name
 FROM
-    Employees
+    employees e
 INNER JOIN
-    Roles  ON role_id = role_id
+    roles r ON e.role_id = r.id
 INNER JOIN
-    Departments  ON department_id = department_id
+    departments d ON r.department_id = d.id
 LEFT JOIN
-    Employees  ON manager_id = employee_id;
+    employees m ON e.manager_id = m.id;
 
 SELECT
-    role_id,
-    title AS job_title,
-    department_name,
-    salary
+    r.id AS role_id,
+    r.title AS job_title,
+    d.name AS department_name,
+    r.salary
 FROM
-    Roles 
+    roles r
 INNER JOIN
-    Departments ON r.department_id = department_id;
+    departments d ON r.department_id = d.id;
