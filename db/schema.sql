@@ -1,9 +1,6 @@
 DROP DATABASE IF EXISTS employees;
 CREATE DATABASE IF NOT EXISTS employees;
-
-
 USE employees;
-
 
 CREATE TABLE departments (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -27,3 +24,5 @@ CREATE TABLE employees (
     FOREIGN KEY (role_id) REFERENCES roles(id),
     FOREIGN KEY (manager_id) REFERENCES employees(id)
 );
+
+ALTER TABLE employees ADD COLUMN department_id INT;

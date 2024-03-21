@@ -1,195 +1,232 @@
-const express = require('express');
-const mysql = require('mysql2/promise'); // Import mysql2 with promise support
+const mysql = require('mysql2/promise');
 const inquirer = require('inquirer');
+require('console.table');
 
-const app = express();
-const PORT = process.env.PORT || 3000;
+const promptMessages = {
+    viewAllEmployees: "View All Employees",
+    viewByDepartment: "View All Employees By Department",
+    viewByManager: "View All Employees By Manager",
+    addEmployee: "Add An Employee",
+    removeEmployee: "Remove An Employee",
+    updateRole: "Update Employee Role",
+    viewAllRoles: "View All Roles",
+    exit: "Exit"
+};
 
-// Create MySQL connection using mysql2
-const connection = mysql.createConnection({
-    host: 'localhost',
-    user: 'root',
-    password: '1413',
-    database: 'employees'
-});
+async function initializeServer() {
+    try {
+        const connection = await mysql.createConnection({
+            host: 'localhost',
+            user: 'root',
+            password: '1413',
+            database: 'employees'
+        });
 
-// Function to handle queries using Promises
-function queryPromise(sql, args) {
-    return connection.execute(sql, args).then(([rows, fields]) => {
-        return rows;
-    }).catch((err) => {
-        throw err;
-    });
+        async function prompt() {
+            try {
+                const { action } = await inquirer.prompt({
+                    name: 'action',
+                    type: 'list',
+                    message: 'What would you like to do?',
+                    choices: [
+                        promptMessages.viewAllEmployees,
+                        promptMessages.viewByDepartment,
+                        promptMessages.viewByManager,
+                        promptMessages.viewAllRoles,
+                        promptMessages.addEmployee,
+                        promptMessages.removeEmployee,
+                        promptMessages.updateRole,
+                        promptMessages.exit
+                    ]
+                });
+
+                switch (action) {
+                    case promptMessages.viewAllEmployees:
+                        await viewAllEmployees();
+                        break;
+                    case promptMessages.viewByDepartment:
+                        await viewByDepartment();
+                        break;
+                    case promptMessages.viewByManager:
+                        await viewByManager();
+                        break;
+                    case promptMessages.addEmployee:
+                        await addEmployee();
+                        break;
+                    case promptMessages.removeEmployee:
+                        await removeEmployee();
+                        break;
+                    case promptMessages.updateRole:
+                        await updateRole();
+                        break;
+                    case promptMessages.viewAllRoles:
+                        await viewAllRoles();
+                        break;
+                    case promptMessages.exit:
+                        await connection.end();
+                        process.exit();
+                        break;
+                }
+            } catch (err) {
+                console.error('Error:', err);
+            }
+        }
+
+        async function viewAllEmployees() {
+            const [rows] = await connection.execute(`SELECT * FROM Employees`);
+            console.table(rows);
+            await prompt();
+        }
+
+        async function viewByDepartment() {
+            const [rows] = await connection.execute(`
+                SELECT e.id, e.first_name, e.last_name, r.title AS role, d.name AS department
+                FROM employees e
+                INNER JOIN roles r ON e.role_id = r.id
+                INNER JOIN departments d ON r.department_id = d.id
+                ORDER BY d.name
+            `);
+            console.table(rows);
+            await prompt();
+        }
+
+        async function viewByManager() {
+            const [rows] = await connection.execute(`SELECT * FROM employees ORDER BY manager_id`);
+            console.table(rows);
+            await prompt();
+        }
+
+        async function viewAllRoles() {
+            try {
+                // Fetch all roles from the database
+                const [roles] = await connection.execute('SELECT * FROM roles');
+
+                // Display the list of roles
+                console.log('All Roles:');
+                roles.forEach(role => {
+                    console.log(`ID: ${role.id} | Title: ${role.title} | Salary: ${role.salary} | Department ID: ${role.department_id}`);
+                });
+            } catch (error) {
+                console.error('Error fetching roles:', error);
+            }
+
+            await prompt();
+        }
+
+        // add employee
+        async function addEmployee() {
+            try {
+
+                const [roles] = await connection.execute('SELECT id, title FROM roles');
+
+                const roleChoices = roles.map(role => ({
+                    name: `${role.title} (ID: ${role.id})`,
+                    value: role.id
+                }));
+
+                const { firstName, lastName, roleId, managerId } = await inquirer.prompt([
+                    {
+                        name: 'firstName',
+                        type: 'input',
+                        message: 'Enter the employee\'s first name:'
+                    },
+                    {
+                        name: 'lastName',
+                        type: 'input',
+                        message: 'Enter the employee\'s last name:'
+                    },
+                    {
+                        name: 'roleId',
+                        type: 'list',
+                        message: 'Select the role for the employee:',
+                        choices: roleChoices
+                    },
+                    {
+                        name: 'managerId',
+                        type: 'input',
+                        message: 'Enter the manager ID for the employee (if applicable):'
+                    }
+                ]);
+
+                console.log('Employee added successfully');
+            } catch (error) {
+                console.error('Error adding employee:', error);
+            }
+
+            await prompt();
+        }
+
+        // remove employee
+
+        async function removeEmployee() {
+            const { id } = await inquirer.prompt({
+                name: 'id',
+                type: 'input',
+                message: 'Enter the employee ID to remove:'
+            });
+
+            const employeeIdValue = parseInt(id);
+
+            if (isNaN(employeeIdValue)) {
+                console.log('Invalid employee ID. Please provide a valid integer value.');
+                return;
+            }
+
+            try {
+
+                await connection.execute('UPDATE employees SET manager_id = NULL WHERE manager_id = ?', [employeeIdValue]);
+
+
+                await connection.execute('DELETE FROM employees WHERE id = ?', [employeeIdValue]);
+                console.log('Employee removed successfully');
+            } catch (error) {
+                console.error('Error removing employee:', error);
+            }
+
+            await prompt();
+        }
+        // update role
+        async function updateRole() {
+            try {
+                const [roles] = await connection.execute('SELECT id, title FROM roles');
+
+                const roleChoices = roles.map(role => ({
+                    name: `${role.title} (ID: ${role.id})`,
+                    value: role.id
+                }));
+
+                const { employeeId, roleId } = await inquirer.prompt([
+                    {
+                        name: 'employeeId',
+                        type: 'input',
+                        message: 'Enter the employee ID to update role:'
+                    },
+                    {
+                        name: 'roleId',
+                        type: 'list',
+                        message: 'Select the new role for the employee:',
+                        choices: roleChoices
+                    }
+                ]);
+
+                try {
+                    await connection.execute('UPDATE Employees SET role_id = ? WHERE id = ?', [roleId, employeeId]);
+                    console.log('Employee role updated successfully');
+                } catch (error) {
+                    console.error('Error updating employee role:', error);
+                }
+            } catch (error) {
+                console.error('Error fetching roles:', error);
+            }
+
+            await prompt();
+        }
+
+        await prompt();
+    } catch (error) {
+        console.error('Error initializing server:', error);
+    }
 }
 
-
-// Your route handlers using queryPromise function
-// View all departments
-app.get('/departments', async (req, res) => {
-    try {
-        const results = await queryPromise('SELECT * FROM Departments');
-        res.json(results);
-    } catch (err) {
-        console.error('Error retrieving departments:', err);
-        res.status(500).send('Internal Server Error');
-    }
-});
-
-// View all roles
-app.get('/roles', async (req, res) => {
-    try {
-        const results = await queryPromise('SELECT * FROM Roles');
-        res.json(results);
-    } catch (err) {
-        console.error('Error retrieving roles:', err);
-        res.status(500).send('Internal Server Error');
-    }
-});
-
-// Add a department
-app.post('/departments', async (req, res) => {
-    try {
-        const answers = await inquirer.prompt([
-            {
-                type: 'input',
-                name: 'departmentName',
-                message: 'Enter the name of the department:'
-            }
-        ]);
-        const { departmentName } = answers;
-
-        const result = await queryPromise('INSERT INTO Departments (department_name) VALUES (?)', [departmentName]);
-        res.status(201).send('Department added successfully');
-    } catch (err) {
-        console.error('Error adding department:', err);
-        res.status(500).send('Internal Server Error');
-    }
-});
-
-// Add a role
-app.post('/roles', async (req, res) => {
-    try {
-        const answers = await inquirer.prompt([
-            {
-                type: 'input',
-                name: 'title',
-                message: 'Enter the title of the role:'
-            },
-            {
-                type: 'input',
-                name: 'salary',
-                message: 'Enter the salary for the role:'
-            },
-            {
-                type: 'input',
-                name: 'departmentId',
-                message: 'Enter the department ID for the role:'
-            }
-        ]);
-
-        const { title, salary, departmentId } = answers;
-
-        const result = await queryPromise('INSERT INTO Roles (title, salary, department_id) VALUES (?, ?, ?)', [title, salary, departmentId]);
-
-        res.status(201).send('Role added successfully');
-    } catch (err) {
-        console.error('Error adding role:', err);
-        res.status(500).send('Internal Server Error');
-    }
-})
-
-// Add an employee
-app.post('/employees', async (req, res) => {
-    try {
-        const answers = await inquirer.prompt([
-            {
-                type: 'input',
-                name: 'firstName',
-                message: 'Enter the employee\'s first name:'
-            },
-            {
-                type: 'input',
-                name: 'lastName',
-                message: 'Enter the employee\'s last name:'
-            },
-            {
-                type: 'input',
-                name: 'roleId',
-                message: 'Enter the role ID for the employee:'
-            },
-            {
-                type: 'input',
-                name: 'managerId',
-                message: 'Enter the manager ID for the employee (if applicable):'
-            }
-        ]);
-
-        const { firstName, lastName, roleId, managerId } = answers;
-
-        const result = await queryPromise('INSERT INTO Employees (first_name, last_name, role_id, manager_id) VALUES (?, ?, ?, ?)', [firstName, lastName, roleId, managerId]);
-
-        res.status(201).send('Employee added successfully');
-    } catch (err) {
-        console.error('Error adding employee:', err);
-        res.status(500).send('Internal Server Error');
-    }
-});
-
-// Add your route handlers here
-// Update an employee
-app.put('/employees/:id', async (req, res) => {
-    const employeeId = req.params.id;
-    try {
-        const answers = await inquirer.prompt([
-            {
-                type: 'input',
-                name: 'firstName',
-                message: 'Enter the updated first name of the employee:'
-            },
-            {
-                type: 'input',
-                name: 'lastName',
-                message: 'Enter the updated last name of the employee:'
-            },
-            {
-                type: 'input',
-                name: 'roleId',
-                message: 'Enter the updated role ID for the employee:'
-            },
-            {
-                type: 'input',
-                name: 'managerId',
-                message: 'Enter the updated manager ID for the employee (if applicable):'
-            }
-        ]);
-
-        const { firstName, lastName, roleId, managerId } = answers;
-
-        const result = await queryPromise('UPDATE Employees SET first_name = ?, last_name = ?, role_id = ?, manager_id = ? WHERE id = ?', [firstName, lastName, roleId, managerId, employeeId]);
-
-        res.status(200).send('Employee updated successfully');
-    } catch (err) {
-        console.error('Error updating employee:', err);
-        res.status(500).send('Internal Server Error');
-    }
-});
-
-// Delete an employee
-app.delete('/employees/:id', async (req, res) => {
-    const employeeId = req.params.id;
-    try {
-        // Execute query to delete employee based on employeeId using queryPromise
-        res.status(200).send('Employee deleted successfully');
-    } catch (err) {
-        console.error('Error deleting employee:', err);
-        res.status(500).send('Internal Server Error');
-    }
-});
-// Start the server
-app.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-});
-
-
-
-
+//  the initializeServer function
+initializeServer();
